@@ -1,0 +1,33 @@
+{
+  "name": "my-better-auth",
+  "version": "1.0.0",
+  "description": "Standalone Better Auth server — central authentication service for all my apps",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx src/migrate.ts",
+    "auth:generate": "better-auth generate --config src/lib/auth.ts",
+    "auth:migrate": "better-auth migrate --config src/lib/auth.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "better-auth": "^1.6.23",
+    "dotenv": "^16.4.5",
+    "hono": "^4.6.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
