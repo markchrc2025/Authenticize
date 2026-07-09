@@ -1,6 +1,6 @@
 # My Better Auth
 
-A standalone [Better Auth](https://better-auth.com) server that acts as the **central authentication service for all of your apps**. Built with [Hono](https://hono.dev) + PostgreSQL, packaged as a small Docker image, and designed to deploy on [Sliplane](https://sliplane.io) in a few clicks.
+A personal **authentication platform**: a standalone [Better Auth](https://better-auth.com) server that acts as a full **OAuth 2.1 / OIDC provider** for all of your apps — each app connects with generated `client_id`/`client_secret` credentials, like your own private Auth0. Invite-only (public sign-up is disabled; accounts are created by an admin), built with [Hono](https://hono.dev) + PostgreSQL, packaged as a small Docker image, and designed to deploy on [Sliplane](https://sliplane.io) in a few clicks.
 
 ```
 ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
@@ -38,7 +38,12 @@ A standalone [Better Auth](https://better-auth.com) server that acts as the **ce
 
 | Route | Purpose |
 | --- | --- |
-| `/api/auth/*` | All Better Auth endpoints (sign-up, sign-in, sessions, OAuth callbacks, ...) |
+| `/.well-known/openid-configuration` | OIDC discovery document (also under `/api/auth`) |
+| `/.well-known/oauth-authorization-server` | OAuth 2.1 server metadata |
+| `/api/auth/oauth2/authorize` · `token` · `userinfo` · `introspect` · `revoke` | The OIDC provider endpoints your apps use |
+| `/api/auth/jwks` | RS256 signing keys (JWKS) |
+| `/api/auth/*` | Core Better Auth endpoints (sign-in, sessions, admin plugin, ...) |
+| `/admin/api/*` | Platform admin API (stats, config, app registry) — admin session required |
 | `/health` | Shallow health check — configure this as the Sliplane health check route |
 | `/health/db` | Deep health check (verifies database connectivity) |
 | `/` | Service info |
@@ -159,6 +164,8 @@ Every app origin must be listed in `TRUSTED_ORIGINS`, otherwise CORS and Better 
 | `BETTER_AUTH_SECRET` | ✅ | ≥32-char secret for hashing/encryption/signing (`openssl rand -base64 32`) |
 | `BETTER_AUTH_URL` | ✅ | Public base URL of this auth server |
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `ADMIN_EMAILS` | ✅ | Comma-separated emails of platform administrators (dashboard access) |
+| `ADMIN_INITIAL_PASSWORD` | first boot | Creates the first admin account if it doesn't exist; change the password after first login, then remove |
 | `TRUSTED_ORIGINS` | for multi-app | Comma-separated origins allowed to use this server (CORS + trustedOrigins) |
 | `COOKIE_DOMAIN` | recommended | e.g. `.example.com` — share the session cookie across all subdomains |
 | `AUTO_MIGRATE` | – | `false` to skip schema migration on boot (default `true`) |

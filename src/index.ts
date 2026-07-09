@@ -1,25 +1,47 @@
+import {
+  oauthProviderAuthServerMetadata,
+  oauthProviderOpenIdConfigMetadata,
+} from "@better-auth/oauth-provider";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { adminApi } from "./admin/api.js";
+import { ensureAdminUsers } from "./bootstrap.js";
 import { pool } from "./db.js";
 import { env } from "./env.js";
+import { getRegisteredClientOrigins } from "./lib/app-origins.js";
 import { auth } from "./lib/auth.js";
 import { runMigrationsWithRetry } from "./migrate.js";
 
 const app = new Hono();
 
-// Cross-origin requests from your apps. Only origins listed in
-// TRUSTED_ORIGINS are allowed, and credentials (cookies) are enabled.
+// Cross-origin requests from connected apps: origins listed in
+// TRUSTED_ORIGINS plus the origins of registered OAuth clients.
 app.use(
   "/api/auth/*",
   cors({
-    origin: env.trustedOrigins,
+    origin: async (origin) => {
+      if (!origin) return null;
+      if (env.trustedOrigins.includes(origin)) return origin;
+      return (await getRegisteredClientOrigins()).includes(origin)
+        ? origin
+        : null;
+    },
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
     maxAge: 600,
     credentials: true,
   }),
+);
+
+// OIDC discovery documents at the server root (Better Auth serves them under
+// /api/auth as well, but standard clients resolve them from the issuer root).
+const openIdConfig = oauthProviderOpenIdConfigMetadata(auth);
+const authServerConfig = oauthProviderAuthServerMetadata(auth);
+app.get("/.well-known/openid-configuration", (c) => openIdConfig(c.req.raw));
+app.get("/.well-known/oauth-authorization-server", (c) =>
+  authServerConfig(c.req.raw),
 );
 
 // Shallow health check — used by Sliplane to gate deploys and monitor the
@@ -40,23 +62,33 @@ app.get("/", (c) =>
   c.json({
     service: "my-better-auth",
     status: "ok",
-    endpoints: { auth: "/api/auth/*", health: "/health" },
+    endpoints: {
+      auth: "/api/auth/*",
+      oidcDiscovery: "/.well-known/openid-configuration",
+      adminApi: "/admin/api/*",
+      health: "/health",
+    },
   }),
 );
 
-// All Better Auth endpoints (sign-up, sign-in, session, OAuth callbacks, ...).
+// Platform admin API (dashboard backend) — session + admin role required.
+app.route("/admin/api", adminApi);
+
+// All Better Auth endpoints: sign-in, sessions, OAuth2/OIDC provider
+// (authorize, token, userinfo, ...), admin plugin, JWKS.
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 async function main() {
   if (env.autoMigrate) {
     await runMigrationsWithRetry();
   }
+  await ensureAdminUsers();
 
   const server = serve(
     { fetch: app.fetch, port: env.port, hostname: "0.0.0.0" },
     (info) => {
       console.log(`My Better Auth listening on http://${info.address}:${info.port}`);
-      console.log(`Base URL: ${env.baseURL}`);
+      console.log(`Issuer: ${env.baseURL}`);
     },
   );
 
