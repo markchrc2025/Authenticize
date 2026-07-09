@@ -30,6 +30,13 @@ export const env = {
   trustedOrigins: csv(process.env.TRUSTED_ORIGINS),
   cookieDomain: process.env.COOKIE_DOMAIN || undefined,
   autoMigrate: (process.env.AUTO_MIGRATE ?? "true").toLowerCase() !== "false",
+
+  // Emails allowed to administer the platform (dashboard + admin APIs).
+  // The first entry is created automatically on first boot when
+  // ADMIN_INITIAL_PASSWORD is set.
+  adminEmails: csv(process.env.ADMIN_EMAILS).map((e) => e.toLowerCase()),
+  adminInitialPassword: process.env.ADMIN_INITIAL_PASSWORD || undefined,
+
   github: {
     clientId: process.env.GITHUB_CLIENT_ID,
     clientSecret: process.env.GITHUB_CLIENT_SECRET,

@@ -27,6 +27,8 @@ services:
       BETTER_AUTH_URL: http://localhost:3000
       DATABASE_URL: postgres://better_auth:better_auth@db:5432/better_auth
       TRUSTED_ORIGINS: http://localhost:5173,http://localhost:3001
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-admin@example.com}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-change-me-after-first-login}
     ports:
       - "3000:3000"
 
