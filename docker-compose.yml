@@ -1,0 +1,34 @@
+# Local development / parity testing.
+# Mirrors the Sliplane setup: one Postgres service + one auth service.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: better_auth
+      POSTGRES_PASSWORD: better_auth
+      POSTGRES_DB: better_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U better_auth -d better_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-only-secret-change-me-please-1234}
+      BETTER_AUTH_URL: http://localhost:3000
+      DATABASE_URL: postgres://better_auth:better_auth@db:5432/better_auth
+      TRUSTED_ORIGINS: http://localhost:5173,http://localhost:3001
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
