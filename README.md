@@ -208,7 +208,8 @@ shared-cookie or same-origin requirement.
 | `BETTER_AUTH_URL` | ✅ | Public base URL of this auth server |
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
 | `ADMIN_EMAILS` | ✅ | Comma-separated emails of platform administrators (dashboard access) |
-| `ADMIN_INITIAL_PASSWORD` | first boot | Creates the first admin account if it doesn't exist; change the password after first login, then remove |
+| `ADMIN_INITIAL_PASSWORD` | first boot | Creates the first admin account if it doesn't exist; change the password after first login, then remove. (No effect if the account already exists.) |
+| `ADMIN_RESET_PASSWORD` | if locked out | While set, force-resets every `ADMIN_EMAILS` account's password on each boot. Set it, redeploy, sign in, then **remove it**. |
 | `TRUSTED_ORIGINS` | optional | Extra allowed origins (CORS + trustedOrigins). Connected apps' redirect-URI origins are trusted automatically. |
 | `COOKIE_DOMAIN` | optional | e.g. `.example.com` — share the browser session cookie across subdomains (not needed for OIDC) |
 | `AUTO_MIGRATE` | – | `false` to skip schema migration on boot (default `true`) |
