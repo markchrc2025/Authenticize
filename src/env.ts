@@ -36,6 +36,9 @@ export const env = {
   // ADMIN_INITIAL_PASSWORD is set.
   adminEmails: csv(process.env.ADMIN_EMAILS).map((e) => e.toLowerCase()),
   adminInitialPassword: process.env.ADMIN_INITIAL_PASSWORD || undefined,
+  // Escape hatch: when set, force-resets the password of existing admin
+  // accounts on boot (use it if you're locked out). Remove it afterwards.
+  adminResetPassword: process.env.ADMIN_RESET_PASSWORD || undefined,
 
   github: {
     clientId: process.env.GITHUB_CLIENT_ID,
