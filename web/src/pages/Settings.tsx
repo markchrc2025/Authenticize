@@ -51,6 +51,13 @@ export function SettingsPage() {
                 <span className="text-muted">not set</span>
               )}
             </Row>
+            <Row label="Email delivery">
+              <span className={config.emailConfigured ? "badge-green" : "badge-gray"}>
+                {config.emailConfigured
+                  ? `Enabled (${config.emailProvider})`
+                  : "Not configured"}
+              </span>
+            </Row>
           </div>
 
           <div className="card p-5">

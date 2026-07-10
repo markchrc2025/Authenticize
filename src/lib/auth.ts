@@ -2,6 +2,8 @@ import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { admin, jwt } from "better-auth/plugins";
 import { pool } from "../db.js";
+import { sendEmail } from "../email/index.js";
+import { resetPasswordEmail, verificationEmail } from "../email/templates.js";
 import { env } from "../env.js";
 import { getRegisteredClientOrigins } from "./app-origins.js";
 
@@ -35,6 +37,18 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     disableSignUp: true,
+    // Powers both "Forgot password?" and dashboard invites (invites request a
+    // reset link with ?invite=1 in the redirect, which switches the template).
+    sendResetPassword: async ({ user, url }) => {
+      const invite = /invite(=|%3D)1/.test(url);
+      await sendEmail({ to: user.email, ...resetPasswordEmail({ url, invite }) });
+    },
+  },
+
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmail({ to: user.email, ...verificationEmail({ url }) });
+    },
   },
 
   socialProviders: {
