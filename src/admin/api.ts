@@ -164,6 +164,36 @@ adminApi.post("/apps", async (c) => {
   return c.json(created, 201);
 });
 
+// Identities that have completed a sign-in through an app, most recent first.
+adminApi.get("/apps/:clientId/users", async (c) => {
+  const res = await pool.query(
+    `SELECT u.id, u.email, u.name, u.role, u.banned,
+            count(t.*)::int AS "signInCount",
+            max(t."createdAt") AS "lastSignInAt"
+     FROM "oauthAccessToken" t
+     JOIN "user" u ON u.id = t."userId"
+     WHERE t."clientId" = $1
+     GROUP BY u.id, u.email, u.name, u.role, u.banned
+     ORDER BY max(t."createdAt") DESC`,
+    [c.req.param("clientId")],
+  );
+  return c.json({ users: res.rows });
+});
+
+// Sign-in methods registered per identity (credential = email/password;
+// other providerIds are social/SSO logins into the platform itself).
+adminApi.get("/users/auth-methods", async (c) => {
+  const res = await pool.query(
+    `SELECT "userId", array_agg(DISTINCT "providerId") AS providers
+     FROM account GROUP BY "userId"`,
+  );
+  const methods: Record<string, string[]> = {};
+  for (const row of res.rows) {
+    methods[row.userId as string] = row.providers as string[];
+  }
+  return c.json({ methods });
+});
+
 // Update app settings (name, redirect URIs, consent behavior, ...).
 adminApi.patch("/apps/:clientId", async (c) => {
   const update = await c.req.json<Record<string, unknown>>();

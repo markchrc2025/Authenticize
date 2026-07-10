@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ConnectionDetails } from "../components/ConnectionDetails.tsx";
 import { PageHeader } from "../components/Layout.tsx";
 import { Modal, Spinner, useToast } from "../components/ui.tsx";
-import { api, type OAuthApp } from "../lib/api.ts";
+import { api, type AppUser, type OAuthApp } from "../lib/api.ts";
 import { connectionInfo } from "../lib/snippets.ts";
 
 export function AppDetailPage() {
@@ -11,6 +11,7 @@ export function AppDetailPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [app, setApp] = useState<OAuthApp | null>(null);
+  const [appUsers, setAppUsers] = useState<AppUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rotated, setRotated] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -31,6 +32,10 @@ export function AppDetailPage() {
 
   useEffect(() => {
     load();
+    api
+      .appUsers(clientId)
+      .then((r) => setAppUsers(r.users))
+      .catch(() => setAppUsers([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
@@ -154,6 +159,43 @@ export function AppDetailPage() {
             </div>
             <div className="text-xs text-muted">last sign-in</div>
           </div>
+          <div>
+            <span className={app.disabled ? "badge-red" : "badge-green"}>
+              {app.disabled ? "SSO disabled" : "SSO active"}
+            </span>
+          </div>
+        </div>
+
+        <div className="card p-5">
+          <h2 className="mb-1 text-sm font-semibold text-slate-200">Signed-in users</h2>
+          <p className="hint mb-4">
+            Identities that have authenticated through this application. Whether they
+            are <em>authorized</em> inside the app is the app's own decision.
+          </p>
+          {!appUsers ? (
+            <Spinner />
+          ) : appUsers.length === 0 ? (
+            <p className="text-sm text-muted">No sign-ins yet.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {appUsers.map((u) => (
+                <li key={u.id} className="flex items-center justify-between gap-4 py-2.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm text-slate-100">{u.email}</div>
+                    <div className="truncate text-xs text-muted">{u.name}</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-xs text-slate-200">
+                      {new Date(u.lastSignInAt).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-muted">
+                      last sign-in · {u.signInCount} total
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="card p-5">
