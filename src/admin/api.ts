@@ -78,6 +78,8 @@ function mapClientRow(row: Record<string, unknown>) {
     grantTypes: parseStringArray(row.grantTypes),
     disabled: Boolean(row.disabled),
     skipConsent: Boolean(row.skipConsent),
+    userCount: Number(row.userCount ?? 0),
+    lastUsedAt: row.lastUsedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -85,13 +87,31 @@ function mapClientRow(row: Record<string, unknown>) {
 
 // List all registered apps. Read directly from the database: the Better Auth
 // list endpoint scopes to the session user, but platform apps are created
-// ownerless via the server-only admin endpoint.
+// ownerless via the server-only admin endpoint. Per-app usage is derived from
+// issued tokens (skip-consent apps never write consent rows) unioned with
+// consents (for apps that show the consent screen).
 adminApi.get("/apps", async (c) => {
   const res = await pool.query(
-    `SELECT id, "clientId", name, type, "redirectUris", "postLogoutRedirectUris",
-            scopes, "grantTypes", disabled, "skipConsent", "createdAt", "updatedAt"
-     FROM "oauthClient"
-     ORDER BY "createdAt" DESC NULLS LAST`,
+    `SELECT c.id, c."clientId", c.name, c.type, c."redirectUris",
+            c."postLogoutRedirectUris", c.scopes, c."grantTypes", c.disabled,
+            c."skipConsent", c."createdAt", c."updatedAt",
+            COALESCE(a."userCount", 0)::int AS "userCount",
+            a."lastUsedAt"
+     FROM "oauthClient" c
+     LEFT JOIN (
+       SELECT "clientId",
+              count(DISTINCT "userId")::int AS "userCount",
+              max("createdAt") AS "lastUsedAt"
+       FROM (
+         SELECT "clientId", "userId", "createdAt"
+           FROM "oauthAccessToken" WHERE "userId" IS NOT NULL
+         UNION ALL
+         SELECT "clientId", "userId", "createdAt"
+           FROM "oauthConsent" WHERE "userId" IS NOT NULL
+       ) usage_rows
+       GROUP BY "clientId"
+     ) a ON a."clientId" = c."clientId"
+     ORDER BY c."createdAt" DESC NULLS LAST`,
   );
   return c.json({ apps: res.rows.map(mapClientRow) });
 });

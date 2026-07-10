@@ -84,6 +84,9 @@ export function AppsPage() {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
+                <span className={app.userCount > 0 ? "badge-green" : "badge-gray"}>
+                  {app.userCount} user{app.userCount === 1 ? "" : "s"}
+                </span>
                 <span className="badge-gray">{TYPE_LABELS[app.type] ?? app.type}</span>
                 <span className="text-muted">›</span>
               </div>
