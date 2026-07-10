@@ -3,6 +3,17 @@ import { PageHeader } from "../components/Layout.tsx";
 import { Modal, Spinner, useToast } from "../components/ui.tsx";
 import { api, users, type PlatformUser, type UserSession } from "../lib/api.ts";
 
+// providerId → human label. "credential" is Better Auth's email/password
+// account; anything else is a social/SSO or passwordless method on the
+// platform itself. Apps always consume identities via OIDC regardless.
+const METHOD_LABELS: Record<string, string> = {
+  credential: "Password",
+  google: "Google",
+  github: "GitHub",
+  passkey: "Passkey",
+  "magic-link": "Magic link",
+};
+
 export function UsersPage() {
   const toast = useToast();
   const [list, setList] = useState<PlatformUser[] | null>(null);
@@ -12,15 +23,21 @@ export function UsersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [managing, setManaging] = useState<PlatformUser | null>(null);
   const [emailConfigured, setEmailConfigured] = useState(false);
+  const [authMethods, setAuthMethods] = useState<Record<string, string[]>>({});
 
-  const load = (q = search) =>
-    users
+  const load = (q = search) => {
+    api
+      .authMethods()
+      .then((r) => setAuthMethods(r.methods))
+      .catch(() => {});
+    return users
       .list({ search: q || undefined })
       .then((r) => {
         setList(r.users);
         setTotal(r.total);
       })
       .catch((e) => setError(e.message));
+  };
 
   useEffect(() => {
     load("");
@@ -85,7 +102,19 @@ export function UsersPage() {
                 </div>
                 <div className="mt-0.5 truncate text-xs text-muted">{u.name}</div>
               </div>
-              <span className="text-muted">›</span>
+              <div className="flex shrink-0 items-center gap-2">
+                {(authMethods[u.id] ?? []).map((m) => (
+                  <span key={m} className="badge-gray" title="How this identity signs in to Authenticize">
+                    {METHOD_LABELS[m] ?? m}
+                  </span>
+                ))}
+                {(authMethods[u.id] ?? []).length === 0 && (
+                  <span className="badge-gray" title="No sign-in method registered yet">
+                    no method
+                  </span>
+                )}
+                <span className="text-muted">›</span>
+              </div>
             </button>
           ))}
         </div>

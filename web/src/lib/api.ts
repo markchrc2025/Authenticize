@@ -146,8 +146,28 @@ export const users = {
     }),
 };
 
+export interface AppUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string | null;
+  banned: boolean | null;
+  signInCount: number;
+  lastSignInAt: string;
+}
+
 export const api = {
   stats: () => request<AppStats>("GET", "/admin/api/stats"),
+  appUsers: (clientId: string) =>
+    request<{ users: AppUser[] }>(
+      "GET",
+      `/admin/api/apps/${encodeURIComponent(clientId)}/users`,
+    ),
+  authMethods: () =>
+    request<{ methods: Record<string, string[]> }>(
+      "GET",
+      "/admin/api/users/auth-methods",
+    ),
   config: () => request<PlatformConfig>("GET", "/admin/api/config"),
   listApps: () => request<{ apps: OAuthApp[] }>("GET", "/admin/api/apps"),
   createApp: (body: {
