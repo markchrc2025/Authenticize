@@ -141,6 +141,21 @@ export function AppDetailPage() {
       />
 
       <div className="space-y-6">
+        <div className="card flex flex-wrap items-center gap-x-8 gap-y-2 p-5">
+          <div>
+            <div className="text-2xl font-semibold text-slate-100">{app.userCount}</div>
+            <div className="text-xs text-muted">
+              unique user{app.userCount === 1 ? "" : "s"} signed in via this app
+            </div>
+          </div>
+          <div>
+            <div className="text-sm text-slate-200">
+              {app.lastUsedAt ? new Date(app.lastUsedAt).toLocaleString() : "never"}
+            </div>
+            <div className="text-xs text-muted">last sign-in</div>
+          </div>
+        </div>
+
         <div className="card p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-200">Redirect URIs</h2>

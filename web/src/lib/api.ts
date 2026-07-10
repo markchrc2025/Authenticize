@@ -57,6 +57,9 @@ export interface OAuthApp {
   grantTypes: string[];
   disabled: boolean;
   skipConsent: boolean;
+  /** Distinct identities that have signed in through this app. */
+  userCount: number;
+  lastUsedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
