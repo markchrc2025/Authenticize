@@ -91,6 +91,11 @@ export function LoginPage() {
           <button className="btn-primary w-full" type="submit" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </button>
+          <p className="text-center text-xs">
+            <a href="/forgot-password" className="text-muted hover:text-slate-200">
+              Forgot password?
+            </a>
+          </p>
         </form>
         <p className="mt-4 text-center text-xs text-muted">
           This is a private, invite-only platform.

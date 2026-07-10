@@ -1,6 +1,7 @@
 import { APIError } from "better-auth/api";
 import { Hono } from "hono";
 import { pool } from "../db.js";
+import { emailConfigured } from "../email/index.js";
 import { env } from "../env.js";
 import {
   invalidateClientOriginsCache,
@@ -56,6 +57,8 @@ adminApi.get("/config", (c) =>
     authBasePath: "/api/auth",
     inviteOnly: true,
     cookieDomain: env.cookieDomain ?? null,
+    emailConfigured: emailConfigured(),
+    emailProvider: env.email.provider || null,
     socialProviders: {
       github: Boolean(env.github.clientId && env.github.clientSecret),
       google: Boolean(env.google.clientId && env.google.clientSecret),

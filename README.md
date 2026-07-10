@@ -200,6 +200,35 @@ shared-cookie or same-origin requirement.
 > back to your app with an authorization code. Since the platform is invite-only,
 > create each user in the dashboard first.
 
+## Email (password resets, invites, verification)
+
+The **auth server sends all identity emails** — password resets, "set your
+password" invites when you create users, and email verification. (Your apps
+send their own business email — payslips, notifications — separately; one
+Resend account with an API key per app works well.)
+
+Two pluggable providers, chosen by `EMAIL_PROVIDER`:
+
+- **`resend`** — [Resend](https://resend.com) HTTP API. Setup: create an
+  account → verify your domain (DNS records they show you) → create an API
+  key → set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, and
+  `EMAIL_FROM=Auth <auth@yourdomain.com>`. Free tier: 3,000 emails/month.
+- **`smtp`** — any SMTP relay via nodemailer. This is the **Amazon SES
+  migration path**: create SES SMTP credentials and set
+  `EMAIL_PROVIDER=smtp`, `SMTP_HOST=email-smtp.<region>.amazonaws.com`,
+  `SMTP_PORT=587`, `SMTP_USER`/`SMTP_PASS`. Switching from Resend to SES is
+  purely an env-var change — no code. (Also works with Gmail app passwords.)
+
+Until email is configured, everything else works; the dashboard hides
+invite/reset buttons and the "Forgot password?" flow reports that email isn't
+set up. With it configured:
+
+- Login page gains a working **Forgot password?** flow (public `/forgot-password`
+  and `/reset-password` pages, 1-hour token, single-use).
+- **Create user** in the dashboard can email the person a "set your own
+  password" invite link instead of you sharing a temp password.
+- Each user's management modal gets an **Email reset link** button.
+
 ## Environment variables
 
 | Variable | Required | Description |
@@ -212,6 +241,10 @@ shared-cookie or same-origin requirement.
 | `ADMIN_RESET_PASSWORD` | if locked out | While set, force-resets every `ADMIN_EMAILS` account's password on each boot. Set it, redeploy, sign in, then **remove it**. |
 | `TRUSTED_ORIGINS` | optional | Extra allowed origins (CORS + trustedOrigins). Connected apps' redirect-URI origins are trusted automatically. |
 | `COOKIE_DOMAIN` | optional | e.g. `.example.com` — share the browser session cookie across subdomains (not needed for OIDC) |
+| `EMAIL_PROVIDER` | for email | `resend` or `smtp` (empty = email features off) |
+| `EMAIL_FROM` | for email | Sender, e.g. `My Better Auth <auth@yourdomain.com>` |
+| `RESEND_API_KEY` | provider=resend | Resend API key |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_SECURE` | provider=smtp | SMTP relay (Amazon SES, Gmail, ...) |
 | `AUTO_MIGRATE` | – | `false` to skip schema migration on boot (default `true`) |
 | `PORT` | – | Listen port (default `3000`) |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | Enable GitHub sign-in |

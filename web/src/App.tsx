@@ -6,8 +6,10 @@ import { useSession } from "./lib/auth-client.ts";
 import { AppDetailPage } from "./pages/AppDetail.tsx";
 import { AppsPage } from "./pages/Apps.tsx";
 import { ConsentPage } from "./pages/Consent.tsx";
+import { ForgotPasswordPage } from "./pages/ForgotPassword.tsx";
 import { LoginPage } from "./pages/Login.tsx";
 import { OverviewPage } from "./pages/Overview.tsx";
+import { ResetPasswordPage } from "./pages/ResetPassword.tsx";
 import { SettingsPage } from "./pages/Settings.tsx";
 import { UsersPage } from "./pages/Users.tsx";
 
@@ -60,6 +62,8 @@ export function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/consent" element={<ConsentPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/" element={<RequireAdmin><OverviewPage /></RequireAdmin>} />
         <Route path="/apps" element={<RequireAdmin><AppsPage /></RequireAdmin>} />
         <Route

@@ -40,6 +40,23 @@ export const env = {
   // accounts on boot (use it if you're locked out). Remove it afterwards.
   adminResetPassword: process.env.ADMIN_RESET_PASSWORD || undefined,
 
+  // Outbound email. provider: "resend" (HTTP API) or "smtp" (nodemailer —
+  // covers Amazon SES, Gmail, or any relay). Unset = email features disabled.
+  email: {
+    provider: (process.env.EMAIL_PROVIDER ?? "").toLowerCase() as
+      | "resend"
+      | "smtp"
+      | "",
+    from: process.env.EMAIL_FROM || undefined,
+    resendApiKey: process.env.RESEND_API_KEY || undefined,
+    resendApiUrl: process.env.RESEND_API_URL || "https://api.resend.com",
+    smtpHost: process.env.SMTP_HOST || undefined,
+    smtpPort: Number(process.env.SMTP_PORT ?? 587),
+    smtpUser: process.env.SMTP_USER || undefined,
+    smtpPass: process.env.SMTP_PASS || undefined,
+    smtpSecure: (process.env.SMTP_SECURE ?? "").toLowerCase() === "true",
+  },
+
   github: {
     clientId: process.env.GITHUB_CLIENT_ID,
     clientSecret: process.env.GITHUB_CLIENT_SECRET,

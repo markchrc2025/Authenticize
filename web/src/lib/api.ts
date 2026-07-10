@@ -41,6 +41,8 @@ export interface PlatformConfig {
   authBasePath: string;
   inviteOnly: boolean;
   cookieDomain: string | null;
+  emailConfigured: boolean;
+  emailProvider: string | null;
   socialProviders: { github: boolean; google: boolean };
 }
 
@@ -132,6 +134,13 @@ export const users = {
     request<unknown>("POST", `${AUTH}/revoke-user-session`, { sessionToken }),
   remove: (userId: string) =>
     request<unknown>("POST", `${AUTH}/remove-user`, { userId }),
+  // Emails a password setup/reset link. invite=true switches the email
+  // template and the reset page copy to the "welcome" variant.
+  sendPasswordLink: (email: string, invite: boolean) =>
+    request<unknown>("POST", "/api/auth/request-password-reset", {
+      email,
+      redirectTo: invite ? "/reset-password?invite=1" : "/reset-password",
+    }),
 };
 
 export const api = {

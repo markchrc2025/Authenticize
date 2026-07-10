@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { PageHeader } from "../components/Layout.tsx";
 import { Modal, Spinner, useToast } from "../components/ui.tsx";
-import { users, type PlatformUser, type UserSession } from "../lib/api.ts";
+import { api, users, type PlatformUser, type UserSession } from "../lib/api.ts";
 
 export function UsersPage() {
   const toast = useToast();
@@ -11,6 +11,7 @@ export function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managing, setManaging] = useState<PlatformUser | null>(null);
+  const [emailConfigured, setEmailConfigured] = useState(false);
 
   const load = (q = search) =>
     users
@@ -23,6 +24,10 @@ export function UsersPage() {
 
   useEffect(() => {
     load("");
+    api
+      .config()
+      .then((c) => setEmailConfigured(c.emailConfigured))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -88,6 +93,7 @@ export function UsersPage() {
 
       {showCreate && (
         <CreateUserModal
+          emailConfigured={emailConfigured}
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false);
@@ -98,6 +104,7 @@ export function UsersPage() {
       {managing && (
         <ManageUserModal
           user={managing}
+          emailConfigured={emailConfigured}
           onClose={() => setManaging(null)}
           onChanged={() => load()}
           notify={toast.push}
@@ -108,9 +115,11 @@ export function UsersPage() {
 }
 
 function CreateUserModal({
+  emailConfigured,
   onClose,
   onCreated,
 }: {
+  emailConfigured: boolean;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -119,6 +128,7 @@ function CreateUserModal({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("user");
+  const [sendInvite, setSendInvite] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,7 +138,16 @@ function CreateUserModal({
     setError(null);
     try {
       await users.create({ name: name.trim(), email: email.trim(), password, role });
-      toast.push("success", "User created");
+      if (emailConfigured && sendInvite) {
+        try {
+          await users.sendPasswordLink(email.trim(), true);
+          toast.push("success", "User created — invite email sent");
+        } catch {
+          toast.push("error", "User created, but the invite email failed to send");
+        }
+      } else {
+        toast.push("success", "User created");
+      }
       onCreated();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create user");
@@ -167,6 +186,17 @@ function CreateUserModal({
             <option value="admin">Admin (platform access)</option>
           </select>
         </div>
+        {emailConfigured && (
+          <label className="flex items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-brand"
+              checked={sendInvite}
+              onChange={(e) => setSendInvite(e.target.checked)}
+            />
+            Email the user a link to set their own password
+          </label>
+        )}
         {error && (
           <div className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-300">
             {error}
@@ -187,11 +217,13 @@ function CreateUserModal({
 
 function ManageUserModal({
   user,
+  emailConfigured,
   onClose,
   onChanged,
   notify,
 }: {
   user: PlatformUser;
+  emailConfigured: boolean;
   onClose: () => void;
   onChanged: () => void;
   notify: (kind: "success" | "error", msg: string) => void;
@@ -259,6 +291,20 @@ function ManageUserModal({
               }
             >
               Ban
+            </button>
+          )}
+          {emailConfigured && (
+            <button
+              className="btn-secondary"
+              disabled={busy}
+              onClick={() =>
+                run(
+                  () => users.sendPasswordLink(user.email, false),
+                  "Password reset email sent",
+                )
+              }
+            >
+              Email reset link
             </button>
           )}
           <button
