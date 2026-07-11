@@ -1,14 +1,25 @@
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
-import { createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { admin, jwt, twoFactor } from "better-auth/plugins";
 import { pool } from "../db.js";
 import { sendEmail } from "../email/index.js";
 import { resetPasswordEmail, verificationEmail } from "../email/templates.js";
 import { env } from "../env.js";
 import { getRegisteredClientOrigins } from "./app-origins.js";
+import { effectiveAppMethods } from "./sign-in-methods.js";
 import { buildSocialProviders, enabledSocialProviders } from "./social.js";
+
+/** Pull the OAuth client_id out of a social login's callbackURL, if any. */
+function clientIdFromCallback(callbackURL: unknown): string | null {
+  if (typeof callbackURL !== "string" || !callbackURL) return null;
+  try {
+    return new URL(callbackURL, env.baseURL).searchParams.get("client_id");
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Platform administrators: users with the "admin" role, plus anyone listed in
@@ -159,6 +170,26 @@ export const auth = betterAuth({
     // an application account, and the operator check runs again on the
     // continuation request (where the login prompt has been consumed).
     before: createAuthMiddleware(async (ctx) => {
+      // Enforce per-app sign-in method selection for social logins: refuse a
+      // provider the target app hasn't enabled. The login page already hides
+      // the button; this also rejects a hand-crafted request. The target app
+      // is the client_id in the callbackURL (an OIDC login points it back at
+      // /oauth2/authorize?client_id=…); a dashboard login has no client_id and
+      // is never restricted.
+      if (ctx.path === "/sign-in/social") {
+        const provider = ctx.body?.provider;
+        const clientId = clientIdFromCallback(ctx.body?.callbackURL);
+        if (typeof provider === "string" && clientId) {
+          const methods = await effectiveAppMethods(clientId);
+          if (!methods.includes(provider as never)) {
+            throw new APIError("FORBIDDEN", {
+              message: `${provider} sign-in isn't enabled for this application.`,
+            });
+          }
+        }
+        return;
+      }
+
       if (ctx.path !== "/oauth2/authorize") return;
       const url = ctx.request ? new URL(ctx.request.url) : undefined;
       const prompt = url?.searchParams.get("prompt") ?? "";

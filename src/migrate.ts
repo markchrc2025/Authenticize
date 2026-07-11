@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { getMigrations } from "better-auth/db/migration";
 import { auth } from "./lib/auth.js";
+import { ensureSignInMethodsTable } from "./lib/sign-in-methods.js";
 
 export async function runMigrations(): Promise<void> {
   const { toBeCreated, toBeAdded, runMigrations: run } = await getMigrations(
@@ -9,13 +10,15 @@ export async function runMigrations(): Promise<void> {
 
   if (toBeCreated.length === 0 && toBeAdded.length === 0) {
     console.log("[migrate] Database schema is up to date.");
-    return;
+  } else {
+    const tables = [...toBeCreated, ...toBeAdded].map((t) => t.table).join(", ");
+    console.log(`[migrate] Applying schema changes for: ${tables}`);
+    await run();
+    console.log("[migrate] Migrations applied.");
   }
 
-  const tables = [...toBeCreated, ...toBeAdded].map((t) => t.table).join(", ");
-  console.log(`[migrate] Applying schema changes for: ${tables}`);
-  await run();
-  console.log("[migrate] Migrations applied.");
+  // App-owned tables outside Better Auth's schema (created idempotently).
+  await ensureSignInMethodsTable();
 }
 
 // The database may still be booting when the container starts (fresh deploys,

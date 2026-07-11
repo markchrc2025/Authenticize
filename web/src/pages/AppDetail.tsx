@@ -6,6 +6,119 @@ import { Modal, Spinner, useToast } from "../components/ui.tsx";
 import { api, type AppUser, type OAuthApp } from "../lib/api.ts";
 import { connectionInfo } from "../lib/snippets.ts";
 
+const METHOD_LABELS: Record<string, string> = {
+  email: "Email & password",
+  passkey: "Passkeys",
+  google: "Google",
+  microsoft: "Microsoft",
+  apple: "Apple",
+  github: "GitHub",
+};
+
+/**
+ * Per-app sign-in method selection (Firebase-style). Toggles which providers
+ * this app offers on the Authenticize login page. `methods: null` from the API
+ * means the app has no override yet and uses everything available.
+ */
+function SignInMethodsCard({ clientId }: { clientId: string }) {
+  const toast = useToast();
+  const [available, setAvailable] = useState<string[] | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [usingDefault, setUsingDefault] = useState(true);
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api
+      .signInMethods(clientId)
+      .then(({ methods, available }) => {
+        setAvailable(available);
+        setSelected(new Set(methods ?? available));
+        setUsingDefault(methods === null);
+      })
+      .catch(() => setAvailable([]));
+  }, [clientId]);
+
+  const toggle = (m: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
+      return next;
+    });
+    setDirty(true);
+    setUsingDefault(false);
+  };
+
+  const save = async () => {
+    if (selected.size === 0) {
+      toast.push("error", "Enable at least one sign-in method");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { methods } = await api.setSignInMethods(clientId, [...selected]);
+      setSelected(new Set(methods));
+      setUsingDefault(false);
+      setDirty(false);
+      toast.push("success", "Sign-in methods updated");
+    } catch (e) {
+      toast.push("error", e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card p-5">
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-slate-200">Sign-in methods</h2>
+        {dirty && (
+          <button className="btn-primary px-3 py-1 text-xs" onClick={save} disabled={busy}>
+            {busy ? "Saving…" : "Save"}
+          </button>
+        )}
+      </div>
+      <p className="hint mb-4">
+        Which options this app shows on the Authenticize login page.
+        {usingDefault && " Using every available method (default)."}
+      </p>
+      {available === null ? (
+        <Spinner />
+      ) : available.length === 0 ? (
+        <p className="text-sm text-muted">No sign-in methods are configured on the platform.</p>
+      ) : (
+        <ul className="space-y-3">
+          {available.map((m) => {
+            const on = selected.has(m);
+            return (
+              <li key={m} className="flex items-center justify-between">
+                <span className="text-sm text-slate-200">{METHOD_LABELS[m] ?? m}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={on}
+                  aria-label={METHOD_LABELS[m] ?? m}
+                  onClick={() => toggle(m)}
+                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                    on ? "bg-brand" : "bg-border"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                      on ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function AppDetailPage() {
   const { clientId = "" } = useParams();
   const navigate = useNavigate();
@@ -165,6 +278,8 @@ export function AppDetailPage() {
             </span>
           </div>
         </div>
+
+        <SignInMethodsCard clientId={app.clientId} />
 
         <div className="card p-5">
           <h2 className="mb-1 text-sm font-semibold text-slate-200">Signed-in users</h2>

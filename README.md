@@ -64,7 +64,8 @@ served from the root path — locked to accounts in `ADMIN_EMAILS`. From it you 
 - **Applications** — connect an app (web, SPA, or native), which generates its
   `client_id`/`client_secret` and shows ready-to-paste endpoint URLs, an env-var
   block, and framework snippets (Next.js/Auth.js, Node `openid-client`, browser
-  PKCE). Edit redirect URIs, disable, delete, or rotate the secret later.
+  PKCE). Edit redirect URIs, disable, delete, rotate the secret, or choose its
+  **sign-in methods** (see below) later.
 - **Users** — create users (the "invite"), search, set roles, ban/unban, reset
   passwords, and list/revoke sessions.
 - **Security** — turn on two-factor and register passkeys for your own account
@@ -217,6 +218,17 @@ npm run apple:secret                          # prints the JWT → set as APPLE_
 Either way, **management accounts can never sign into a connected app**, and the
 dashboard itself stays invite-only email/password (social self-sign-up never
 grants admin).
+
+### Per-app sign-in methods
+
+Providers are configured once at the platform level, but each app chooses which
+of them it offers — like Firebase's per-project provider toggles. Open an app in
+the dashboard → **Sign-in methods** and toggle email/password, passkeys, and each
+social provider. The Authenticize login page then shows only that app's methods
+when a user signs in through it, and a provider an app hasn't enabled is refused
+server-side even for a hand-crafted request. A new app offers everything
+available until you narrow it, and only providers configured platform-wide can be
+turned on. The dashboard login (no app) always offers every available method.
 
 ## Connecting your apps
 

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { OAuthErrorNotice } from "../components/OAuthErrorNotice.tsx";
+import { Spinner } from "../components/ui.tsx";
 import { authClient } from "../lib/auth-client.ts";
 
 type ProviderId = "google" | "microsoft" | "apple" | "github";
@@ -74,7 +75,14 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [providers, setProviders] = useState<ProviderId[]>([]);
+
+  // Which sign-in methods this login shows. Null until loaded; narrowed to the
+  // requesting app's selection when an app drives the flow (per-app methods).
+  const [methods, setMethods] = useState<{
+    email: boolean;
+    passkey: boolean;
+    social: ProviderId[];
+  } | null>(null);
 
   // Second-factor challenge shown after a correct password when 2FA is on.
   const [stage, setStage] = useState<"credentials" | "twofactor">("credentials");
@@ -83,6 +91,7 @@ export function LoginPage() {
 
   const search = window.location.search;
   const params = new URLSearchParams(search);
+  const clientId = params.get("client_id");
   const isOidcFlow = params.has("client_id") && params.has("redirect_uri");
 
   // Where a successful/failed social round-trip lands. In an OIDC flow both
@@ -101,20 +110,30 @@ export function LoginPage() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/public-config")
+    const q = clientId ? `?client_id=${encodeURIComponent(clientId)}` : "";
+    fetch(`/api/public-config${q}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((cfg) => {
-        if (active && Array.isArray(cfg?.socialProviders)) {
-          setProviders(cfg.socialProviders as ProviderId[]);
+        if (!active) return;
+        const m = cfg?.methods;
+        if (m && typeof m === "object") {
+          setMethods({
+            email: m.email !== false,
+            passkey: Boolean(m.passkey),
+            social: Array.isArray(m.social) ? (m.social as ProviderId[]) : [],
+          });
+        } else {
+          // Config unavailable — fall back to email/password so login still works.
+          setMethods({ email: true, passkey: false, social: [] });
         }
       })
       .catch(() => {
-        /* login still works with email/password if this fails */
+        if (active) setMethods({ email: true, passkey: false, social: [] });
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [clientId]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -250,78 +269,99 @@ export function LoginPage() {
           </div>
         ) : (
           <div className="card space-y-4 p-6">
-            <div className="space-y-2">
-              {providers.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  className="btn-secondary w-full"
-                  disabled={busy}
-                  onClick={() => onSocial(p)}
-                >
-                  {PROVIDER_META[p]?.icon}
-                  {PROVIDER_META[p]?.label ?? `Continue with ${p}`}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="btn-secondary w-full"
-                disabled={busy}
-                onClick={onPasskey}
-              >
-                <span aria-hidden="true">🔑</span>
-                Sign in with a passkey
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted">or</span>
-              <span className="h-px flex-1 bg-border" />
-            </div>
-            <form className="space-y-4" onSubmit={onSubmit}>
-              <div>
-                <label className="label" htmlFor="email">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="username"
-                  className="input"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoFocus
-                />
+            {methods === null ? (
+              <div className="flex justify-center py-6">
+                <Spinner />
               </div>
-              <div>
-                <label className="label" htmlFor="password">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  className="input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              {error && (
-                <div className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-300">
-                  {error}
-                </div>
-              )}
-              <button className="btn-primary w-full" type="submit" disabled={busy}>
-                {busy ? "Signing in…" : "Sign in"}
-              </button>
-              <p className="text-center text-xs">
-                <a href="/forgot-password" className="text-muted hover:text-slate-200">
-                  Forgot password?
-                </a>
-              </p>
-            </form>
+            ) : (
+              <>
+                {(methods.social.length > 0 || methods.passkey) && (
+                  <div className="space-y-2">
+                    {methods.social.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        className="btn-secondary w-full"
+                        disabled={busy}
+                        onClick={() => onSocial(p)}
+                      >
+                        {PROVIDER_META[p]?.icon}
+                        {PROVIDER_META[p]?.label ?? `Continue with ${p}`}
+                      </button>
+                    ))}
+                    {methods.passkey && (
+                      <button
+                        type="button"
+                        className="btn-secondary w-full"
+                        disabled={busy}
+                        onClick={onPasskey}
+                      >
+                        <span aria-hidden="true">🔑</span>
+                        Sign in with a passkey
+                      </button>
+                    )}
+                  </div>
+                )}
+                {error && (
+                  <div className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+                    {error}
+                  </div>
+                )}
+                {methods.email && (methods.social.length > 0 || methods.passkey) && (
+                  <div className="flex items-center gap-3">
+                    <span className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted">or</span>
+                    <span className="h-px flex-1 bg-border" />
+                  </div>
+                )}
+                {methods.email && (
+                  <form className="space-y-4" onSubmit={onSubmit}>
+                    <div>
+                      <label className="label" htmlFor="email">
+                        Email
+                      </label>
+                      <input
+                        id="email"
+                        type="email"
+                        autoComplete="username"
+                        className="input"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="password">
+                        Password
+                      </label>
+                      <input
+                        id="password"
+                        type="password"
+                        autoComplete="current-password"
+                        className="input"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <button className="btn-primary w-full" type="submit" disabled={busy}>
+                      {busy ? "Signing in…" : "Sign in"}
+                    </button>
+                    <p className="text-center text-xs">
+                      <a href="/forgot-password" className="text-muted hover:text-slate-200">
+                        Forgot password?
+                      </a>
+                    </p>
+                  </form>
+                )}
+                {!methods.email && methods.social.length === 0 && !methods.passkey && (
+                  <p className="text-center text-sm text-muted">
+                    No sign-in methods are enabled for this application.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
         <p className="mt-4 text-center text-xs text-muted">
