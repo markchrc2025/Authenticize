@@ -198,6 +198,18 @@ export const api = {
       "POST",
       `/admin/api/apps/${encodeURIComponent(clientId)}/rotate-secret`,
     ),
+  // Per-app sign-in methods. `methods: null` means "all available".
+  signInMethods: (clientId: string) =>
+    request<{ methods: string[] | null; available: string[] }>(
+      "GET",
+      `/admin/api/apps/${encodeURIComponent(clientId)}/sign-in-methods`,
+    ),
+  setSignInMethods: (clientId: string, methods: string[]) =>
+    request<{ methods: string[]; available: string[] }>(
+      "PUT",
+      `/admin/api/apps/${encodeURIComponent(clientId)}/sign-in-methods`,
+      { methods },
+    ),
   deleteApp: (clientId: string) =>
     request<unknown>(
       "DELETE",

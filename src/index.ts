@@ -12,7 +12,11 @@ import { pool } from "./db.js";
 import { env } from "./env.js";
 import { getRegisteredClientOrigins } from "./lib/app-origins.js";
 import { auth } from "./lib/auth.js";
-import { enabledSocialProviders } from "./lib/social.js";
+import {
+  effectiveAppMethods,
+  globallyAvailableMethods,
+  toLoginConfig,
+} from "./lib/sign-in-methods.js";
 import { runMigrationsWithRetry } from "./migrate.js";
 
 const app = new Hono();
@@ -47,14 +51,17 @@ app.get("/.well-known/oauth-authorization-server", (c) =>
 );
 
 // Public, unauthenticated UI config for the login page (which runs before any
-// session exists): tells it which social sign-in buttons to render. Contains
-// no secrets — only the list of enabled provider ids.
-app.get("/api/public-config", (c) =>
-  c.json({
-    appName: "Authenticize",
-    socialProviders: enabledSocialProviders,
-  }),
-);
+// session exists): tells it which sign-in methods to render. When an app drives
+// the login (client_id in the OIDC query), the methods are narrowed to that
+// app's selection; without one (dashboard login) all platform methods show.
+// Contains no secrets — only method/provider ids.
+app.get("/api/public-config", async (c) => {
+  const clientId = c.req.query("client_id");
+  const methods = clientId
+    ? await effectiveAppMethods(clientId)
+    : globallyAvailableMethods();
+  return c.json({ appName: "Authenticize", methods: toLoginConfig(methods) });
+});
 
 // Shallow health check — used by Sliplane to gate deploys and monitor the
 // service. Must return 2xx without auth.

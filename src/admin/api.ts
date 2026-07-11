@@ -8,6 +8,12 @@ import {
   parseStringArray,
 } from "../lib/app-origins.js";
 import { auth, isAdminUser } from "../lib/auth.js";
+import {
+  type SignInMethod,
+  getStoredAppMethods,
+  globallyAvailableMethods,
+  setAppMethods,
+} from "../lib/sign-in-methods.js";
 
 /**
  * Platform admin API consumed by the dashboard. Everything here requires an
@@ -209,6 +215,32 @@ adminApi.patch("/apps/:clientId", async (c) => {
   });
   invalidateClientOriginsCache();
   return c.json(updated);
+});
+
+// Per-app sign-in methods: which providers this app offers on the login page.
+// `methods: null` means the app uses every method the platform has (the
+// default); `available` is what the platform currently supports.
+adminApi.get("/apps/:clientId/sign-in-methods", async (c) => {
+  const methods = await getStoredAppMethods(c.req.param("clientId"));
+  return c.json({ methods, available: globallyAvailableMethods() });
+});
+
+adminApi.put("/apps/:clientId/sign-in-methods", async (c) => {
+  const body = await c.req.json<{ methods?: unknown }>();
+  const available = globallyAvailableMethods();
+  const requested = Array.isArray(body.methods)
+    ? (body.methods.filter((m) =>
+        (available as string[]).includes(m as string),
+      ) as SignInMethod[])
+    : [];
+  if (requested.length === 0) {
+    return c.json(
+      { message: "Select at least one available sign-in method" },
+      400,
+    );
+  }
+  const saved = await setAppMethods(c.req.param("clientId"), requested);
+  return c.json({ methods: saved, available });
 });
 
 // Enable/disable an app without deleting it. (Not part of the plugin's
