@@ -25,8 +25,9 @@ function SignInMethodsCard({ clientId }: { clientId: string }) {
   const [available, setAvailable] = useState<string[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [usingDefault, setUsingDefault] = useState(true);
-  const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // Which method is mid-save (null = idle). Doubles as a "busy" flag: while a
+  // save is in flight we disable the switches so concurrent PUTs can't race.
+  const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -39,48 +40,38 @@ function SignInMethodsCard({ clientId }: { clientId: string }) {
       .catch(() => setAvailable([]));
   }, [clientId]);
 
-  const toggle = (m: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(m)) next.delete(m);
-      else next.add(m);
-      return next;
-    });
-    setDirty(true);
-    setUsingDefault(false);
-  };
-
-  const save = async () => {
-    if (selected.size === 0) {
+  // The switch IS the action: flipping it saves immediately (optimistic), and
+  // reverts if the write fails. No separate Save step to miss.
+  const toggle = async (m: string) => {
+    if (saving) return;
+    const next = new Set(selected);
+    if (next.has(m)) next.delete(m);
+    else next.add(m);
+    if (next.size === 0) {
       toast.push("error", "Enable at least one sign-in method");
       return;
     }
-    setBusy(true);
+    const prev = selected;
+    setSelected(next);
+    setUsingDefault(false);
+    setSaving(m);
     try {
-      const { methods } = await api.setSignInMethods(clientId, [...selected]);
+      const { methods } = await api.setSignInMethods(clientId, [...next]);
       setSelected(new Set(methods));
-      setUsingDefault(false);
-      setDirty(false);
-      toast.push("success", "Sign-in methods updated");
     } catch (e) {
-      toast.push("error", e instanceof Error ? e.message : "Failed");
+      setSelected(prev); // roll back the optimistic flip
+      toast.push("error", e instanceof Error ? e.message : "Couldn't update sign-in methods");
     } finally {
-      setBusy(false);
+      setSaving(null);
     }
   };
 
   return (
     <div className="card p-5">
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-slate-200">Sign-in methods</h2>
-        {dirty && (
-          <button className="btn-primary px-3 py-1 text-xs" onClick={save} disabled={busy}>
-            {busy ? "Saving…" : "Save"}
-          </button>
-        )}
-      </div>
+      <h2 className="mb-1 text-sm font-semibold text-slate-200">Sign-in methods</h2>
       <p className="hint mb-4">
-        Which options this app shows on the Authenticize login page.
+        Which options this app shows on the Authenticize login page. Changes save
+        automatically.
         {usingDefault && " Using every available method (default)."}
       </p>
       {available === null ? (
@@ -99,8 +90,9 @@ function SignInMethodsCard({ clientId }: { clientId: string }) {
                   role="switch"
                   aria-checked={on}
                   aria-label={METHOD_LABELS[m] ?? m}
+                  disabled={saving !== null}
                   onClick={() => toggle(m)}
-                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
                     on ? "bg-brand" : "bg-border"
                   }`}
                 >
